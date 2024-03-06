@@ -213,6 +213,9 @@ class LogStash::Inputs::GooglePubSub < LogStash::Inputs::Base
   # recommended for most use-cases.
   config :create_subscription, :validate => :boolean, :required => false, :default => false
 
+  # If true, the message may contain binary data. By default, the input assumes that the message is UTF-8 string.
+  config :binary_data, :validate => :boolean, :required => false, :default => false
+
   # If undefined, Logstash will complain, even if codec is unused.
   default :codec, "plain"
 
@@ -249,7 +252,11 @@ class LogStash::Inputs::GooglePubSub < LogStash::Inputs::Base
     @logger.debug("Pulling messages from sub '#{@subscription_id}'")
     handler = MessageReceiver.new do |message|
       # handle incoming message, then ack/nack the received message
-      data = message.getData().toStringUtf8()
+      if @binary_data
+        data = message.getData()
+      else
+        data = message.getData().toStringUtf8()
+      end
       @codec.decode(data) do |event|
         event.set("host", event.get("host") || @host)
         event.set("[@metadata][pubsub_message]", extract_metadata(message)) if @include_metadata
